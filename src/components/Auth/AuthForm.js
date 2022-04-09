@@ -1,12 +1,19 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useContext } from 'react';
+import { useHistory } from 'react-router-dom';
+import AuthContext from '../../store/auth-context';
 
 import classes from './AuthForm.module.css';
 
 const AuthForm = () => {
+  const history = useHistory();
+
   const emailInputRef = useRef();
   const passwordInputRef = useRef();
 
+  const authCtx = useContext(AuthContext);
+
   const [isLogin, setIsLogin] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
 
   const switchAuthModeHandler = () => {
     setIsLogin((prevState) => !prevState);
@@ -18,10 +25,15 @@ const AuthForm = () => {
     const enteredEmail = emailInputRef.current.value;
     const enteredPassword = passwordInputRef.current.value;
 
+    setIsLoading(true);
+    let url;
     if (isLogin) {
-
+      url = 'https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=AIzaSyAigp8_yWkHcjX6HPRCLF0t7UdWa62UTRE'
     } else {
-      fetch('https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=AIzaSyAigp8_yWkHcjX6HPRCLF0t7UdWa62UTRE', 
+      url = 'https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=AIzaSyAigp8_yWkHcjX6HPRCLF0t7UdWa62UTRE'
+    }
+
+    fetch(url,
       {
         method: 'POST',
         body: JSON.stringify({
@@ -33,16 +45,25 @@ const AuthForm = () => {
           'Content-Type': 'application/json'
         }
       }).then(res => {
+        setIsLoading(false)
         if (res.ok) {
-          //....
+          return res.json();
         } else {
           return res.json().then(data => {
-            //show an error model
-            console.log(data)
+            let errorMessage = 'Authentication Failed!';
+            if (data && data.error && data.error.message) {
+              errorMessage = data.error.message;
+            }
+            alert(errorMessage);
+            throw new Error(errorMessage)
           })
         }
+      }).then(data => {
+        authCtx.login(data.idToken);
+        history.replace('/');
+      }).catch(err => {
+        alert(err.message)
       });
-    }
   }
 
   return (
@@ -58,7 +79,9 @@ const AuthForm = () => {
           <input type='password' id='password' required ref={passwordInputRef} />
         </div>
         <div className={classes.actions}>
-          <button>{isLogin ? 'Login' : 'Create Account'}</button>
+          {!isLoading && <button>{isLogin ? 'Login' : 'Create Account'}</button>}
+          {isLoading && <p>Sending Request ....</p>}
+
           <button
             type='button'
             className={classes.toggle}
